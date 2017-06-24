@@ -20,7 +20,7 @@ class AppApplication : Application(){
     fun getPhoneID(): String {
 //        val telephonyManager = baseContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 //        val str = telephonyManager.deviceId
-//        return UUID((Settings.Secure.getString(contentResolver, "android_id")).hashCode().toLong(),1).toString()
+        //return UUID((Settings.Secure.getString(contentResolver, "android_id")).hashCode().toLong(),("80914103211118510720").hashCode().toLong() or (str.hashCode().toLong() shl 32)).toString()
         return "ffffffff-8ddb-fa06-6dc3-386d0033c587"
 
      //   (telephonyManager.simSerialNumber).hashCode().toLong() or (str.hashCode().toLong() shl 32)

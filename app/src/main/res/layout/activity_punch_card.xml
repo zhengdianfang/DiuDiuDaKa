@@ -10,4 +10,10 @@
         android:layout_gravity="center"
         android:text="打卡"/>
 
+    <TextView
+        android:id="@+id/logTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        />
+
 </LinearLayout>
