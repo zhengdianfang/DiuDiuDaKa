@@ -1,6 +1,7 @@
 package com.example.dfgzheng.diudiudaka
 
 import android.Manifest
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.preference.PreferenceManager
@@ -9,9 +10,16 @@ import android.text.TextUtils
 import org.json.JSONObject
 import kotlin.properties.Delegates
 import android.os.Build.VERSION
+import android.support.v7.widget.LinearLayoutManager
+import android.support.v7.widget.RecyclerView
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.ViewGroup
+import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import com.squareup.okhttp.*
+import org.json.JSONArray
 import java.io.IOException
 import java.net.URLEncoder
 import java.text.DecimalFormat
@@ -26,18 +34,46 @@ import java.util.*
  */
 class PunchCardActivity : AppCompatActivity(){
 
-    var latitudeTarget  = 39.915
-    var longitudeTarget = 116.472
-    var officeId = 2
-
     var userInfo: JSONObject? = null
     var okhttpClient: OkHttpClient by Delegates.notNull<OkHttpClient>()
 
-    private var logTextView: TextView by Delegates.notNull<TextView>()
+
+    private var recyclerView: RecyclerView by Delegates.notNull<RecyclerView>()
+
+    private var adapter: RecyclerView.Adapter<RecyclerView.ViewHolder> by Delegates.notNull<RecyclerView.Adapter<RecyclerView.ViewHolder>>()
+    private var officeList: JSONArray = JSONArray()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_punch_card)
+
+        recyclerView = findViewById(R.id.officeListView) as RecyclerView
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        adapter =  object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun getItemCount(): Int {
+                val length = officeList.length()
+                return length
+            }
+
+            override fun onBindViewHolder(holder: RecyclerView.ViewHolder?, position: Int) {
+                val office = officeList.getJSONObject(position)
+                val textView = holder?.itemView?.findViewById(R.id.nameView) as TextView
+                val button = holder?.itemView?.findViewById(R.id.punchCardButton) as Button
+                textView.text = office.getString("officeName")
+                if (office.getString("officeId") == "2"){
+                   button.setTextColor(Color.BLUE)
+                }
+                button.setOnClickListener {
+                    punchCard(office.getDouble("longitude"), office.getDouble("latitude"), office.getInt("officeId"))
+                }
+            }
+
+            override fun onCreateViewHolder(parent: ViewGroup?, viewType: Int): RecyclerView.ViewHolder {
+                return object: RecyclerView.ViewHolder(LayoutInflater.from(parent?.context).inflate(R.layout.office_list_item, parent,false)){}
+            }
+
+        }
+        recyclerView.adapter = adapter
 
         val defaultSharedPreferences = PreferenceManager.getDefaultSharedPreferences(baseContext)
         val userInfoString = defaultSharedPreferences.getString("userinfo", "")
@@ -50,12 +86,6 @@ class PunchCardActivity : AppCompatActivity(){
         }else{
             getOfficeList()
         }
-
-        findViewById(R.id.punchCard).setOnClickListener {
-            punchCard()
-        }
-
-        logTextView = findViewById(R.id.logTextView) as TextView
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -70,13 +100,10 @@ class PunchCardActivity : AppCompatActivity(){
         jsonObject.put("mobile_type", "A")
         jsonObject.put("machine_id", (application as AppApplication).getPhoneID())
         jsonObject.put("IP", (application as AppApplication).getMobileIp())
-       // jsonObject.put("IP", "10.0.8.1")
         jsonObject.put("version", (application as AppApplication).getVersionName())
         jsonObject.put("token", userInfo?.getString("token"))
-//        jsonObject.put("token", "4be87dc0b6814cf0a79328bb8e4c93ac")
         jsonObject.put("username", userInfo?.getString("username"))
         jsonObject.put("timestamp", getTime())
-//        jsonObject.put("timestamp", "20170621211254707")
         jsonObject.put("accountType", userInfo?.optInt("accountType"))
         val jsonObject1 = JSONObject()
 
@@ -114,31 +141,20 @@ class PunchCardActivity : AppCompatActivity(){
                 val jsonObject2 = JSONObject(data)
                 val jsonObject3 = jsonObject2.getJSONObject("RESULT_DATA")
                 val jsonArray = jsonObject3.getJSONArray("officeList")
-                var i = 0
-                for(i in 0..jsonArray.length()){
-                    val jsonObject4 = jsonArray.getJSONObject(i)
-                    if(jsonObject4.getString("officeName").equals("北京中基新东方")){
-                        runOnUiThread({
-                            logTextView.append(jsonObject4.toString())
-                        })
-                        latitudeTarget = jsonObject4.getDouble("latitude")
-                        longitudeTarget = jsonObject4.getDouble("longitude")
-                        officeId = jsonObject4.getInt("officeId")
-                        break
-                    }
-                }
+                runOnUiThread({
+                    officeList = jsonArray
+                    adapter.notifyDataSetChanged()
+                })
+
             }
 
         })
     }
 
-    fun punchCard(){
+    fun punchCard(longitude: Double, latitude: Double, officeId: Int){
         val jsonObject = JSONObject()
         val jsonObject1 = JSONObject()
 
-        val decimalFormat = DecimalFormat("####.000000")
-        val format = decimalFormat.format(116.4668480424)
-        val format2 = decimalFormat.format(39.9144156336)
         try {
             jsonObject.put("mobile_type", "A")
             jsonObject.put("machine_id", (application as AppApplication).getPhoneID())
@@ -149,8 +165,8 @@ class PunchCardActivity : AppCompatActivity(){
             jsonObject.put("timestamp", getTime())
             jsonObject.put("accountType", userInfo?.optInt("accountType"))
             Log.d("PunchCardActivity", userInfo?.getString("newversion"))
-            jsonObject1.put("longitude", format)
-            jsonObject1.put("latitude", format2)
+            jsonObject1.put("longitude", longitude)
+            jsonObject1.put("latitude", latitude)
             jsonObject1.put("ab_number", userInfo?.getString("abNumber"))
             jsonObject1.put("ab_name", userInfo?.getString("abNumber"))
             jsonObject1.put("officeId", officeId)
@@ -177,8 +193,10 @@ class PunchCardActivity : AppCompatActivity(){
                 override fun onResponse(response: Response?) {
                     val data = response?.body()?.string()
                     Log.d("PunchCardActivity", data)
+                    val jsonObject2 = JSONObject(data)
+                    val string = jsonObject2.getJSONObject("RESULT_DATA").getString("errorMsg")
                     runOnUiThread({
-                        logTextView.append(data)
+                        Toast.makeText(recyclerView.context, string, Toast.LENGTH_SHORT).show()
                     })
 
                 }
